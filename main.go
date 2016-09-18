@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ayanamist/gdns-go/myip"
 	"github.com/miekg/dns"
 	"golang.org/x/net/http2"
 )
@@ -24,7 +25,7 @@ const (
 var (
 	confFile = flag.String("conf", "config.json", "Specify config json path")
 
-	myIP                *MyIP
+	myIP                *myip.MyIP
 	dnsCache            *DNSCache
 	possibleLoopDomains = []string{GoogleDnsHttpsDomain}
 	fallbackUpstream    = &TcpUdpUpstream{
@@ -205,23 +206,27 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	myIP = new(MyIP)
+	var myIP *myip.MyIP
 	if config.MyIP == "" {
-		myIP.Client = &http.Client{
-			Transport: &http.Transport{
-				Dial: (&net.Dialer{
-					Timeout: 3 * time.Second,
-				}).Dial,
-				ResponseHeaderTimeout: 30 * time.Second,
-				IdleConnTimeout:       30 * time.Second,
+		api := myip.Taobao{
+			Client: &http.Client{
+				Transport: &http.Transport{
+					Dial: (&net.Dialer{
+						Timeout: 3 * time.Second,
+					}).Dial,
+					ResponseHeaderTimeout: 30 * time.Second,
+					IdleConnTimeout:       30 * time.Second,
+				},
+				Timeout: 30 * time.Second,
 			},
-			Timeout: 30 * time.Second,
 		}
+		myIP = myip.New(api)
 		myIP.SetIP(net.IP{127, 0, 0, 1})
 		myIP.StartTaobaoIPLoop(func(oldIP, newIP net.IP) {
 			dnsCache.Purge()
 		})
 	} else {
+		myIP = myip.New(nil)
 		myIP.SetIP(net.ParseIP(config.MyIP))
 	}
 
